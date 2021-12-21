@@ -6,6 +6,7 @@ use std::collections::HashSet;
 
 fn main() {
     part_1();
+    part_2();
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -20,6 +21,12 @@ enum CaveType {
 struct Cave {
     feature: CaveType,
     name: String,
+}
+
+impl std::fmt::Display for Cave {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
 }
 
 fn document_cave(caves: &mut HashMap<String, Cave>, name: &str) {
@@ -110,6 +117,8 @@ fn new_map(filename: &str) -> Map {
             document_cave(&mut caves, b);
             cave_connections.insert(b.clone().to_string(), Vec::new());
         }
+        // would be better to not add start as a destination ever,
+        // and don't bother adding connections for "end"
         cave_connections.get_mut(a).unwrap().push(caves.get(&b.to_string()).unwrap().clone());
         cave_connections.get_mut(b).unwrap().push(caves.get(&a.to_string()).unwrap().clone());
     }
@@ -119,9 +128,99 @@ fn new_map(filename: &str) -> Map {
     }
 }
 
+struct MapTwo {
+    cave_connections: HashMap<String, Vec<Cave>>,
+    caves: HashMap<String, Cave>,
+}
+
+// there has got to be a better way to override next_caves only
+impl MapTwo {
+    fn paths(&self) -> Vec<Vec<Cave>> {
+        let mut completed_paths = Vec::new();
+        let start_cave = self.caves.get("start").unwrap().clone();
+        let path = vec![start_cave];
+        self.complete_path(&mut completed_paths, &path);
+        completed_paths
+    }
+
+    fn complete_path(&self, completed_paths: &mut Vec::<Vec<Cave>>, path: &Vec::<Cave>) {
+        let current_cave = path.iter().last().unwrap();
+        if current_cave.feature == CaveType::End {
+            completed_paths.push(path.to_vec());
+        } else {
+            let next_caves = self.next_caves(path);
+            for nc in next_caves {
+                let mut new_path = path.clone();
+                new_path.push(nc);
+                self.complete_path(completed_paths, &new_path);
+            }
+        }
+    }
+
+    fn next_caves(&self, path: &Vec::<Cave>) -> Vec<Cave> {
+        let last_cave = path.iter().last().unwrap();
+        let connections = self.cave_connections.get(&last_cave.name).unwrap();
+        let mut next_caves = Vec::<Cave>::new();
+        let mut small_caves_visited = HashSet::new();
+        let mut double_small_cave = None;
+        for cave in path {
+            if cave.feature == CaveType::Small {
+                if small_caves_visited.contains(&cave.name) {
+                    double_small_cave = Some(cave.name.clone());
+                } else {
+                    small_caves_visited.insert(cave.name.clone());
+                }
+            }
+        }
+        let dead_ends = self.dead_ends();
+        for cave in connections {
+            if cave.feature == CaveType::Big || cave.feature == CaveType::End {
+                next_caves.push(cave.clone());
+            } else if cave.feature == CaveType::Small {
+                if !small_caves_visited.contains(&cave.name) {
+                    next_caves.push(cave.clone());
+                } else if dead_ends.contains(&cave.name) {
+                    continue;
+                } else if double_small_cave.is_none() {
+                    next_caves.push(cave.clone());
+                }
+            }
+        }
+        next_caves
+    }
+
+    // if a cave is only connected to one small cave, that cave is a trap
+    fn dead_ends(&self) -> HashSet<String> {
+        let mut dead_ends = HashSet::<String>::new();
+        for (cave_name, connections) in self.cave_connections.iter() {
+            if connections.len() == 1 {
+                if connections[0].feature != CaveType::Big {
+                    dead_ends.insert(cave_name.to_string());
+                }
+            }
+        }
+        dead_ends
+    }
+}
+
+fn new_map_2(filename: &str) -> MapTwo {
+    let map = new_map(filename);
+    MapTwo {
+        caves: map.caves,
+        cave_connections: map.cave_connections,
+    }
+}
+
 fn part_1() {
     let map = new_map("input.txt");
     println!("PART 1: {}", map.paths().len());
+}
+
+// this is rather slow
+// could investigate: graph algos, FSMs, concurrency, or just think a bit longer for speed improvements
+fn part_2() {
+    let map = new_map_2("input.txt");
+    println!("PART 2: {}", map.paths().len());
 }
 
 #[cfg(test)]
@@ -157,5 +256,34 @@ mod tests {
     fn test_input() {
         let map = new_map("test-input.txt");
         assert_eq!(map.paths().len(), 226);
+    }
+    #[test]
+    fn test_next_caves_2() {
+        let map = new_map_2("nano-input.txt");
+        let start = map.caves.get("start").unwrap();
+        let b = map.caves.get("b").unwrap();
+        let a = map.caves.get("A").unwrap();
+        let c = map.caves.get("c").unwrap();
+        let end = map.caves.get("end").unwrap();
+        let next = map.next_caves(&vec![start.clone(), b.clone(), a.clone(), c.clone(), a.clone()]);
+        assert_eq!(next.len(), 3);
+    }
+    #[test]
+    fn test_nano_2() {
+        let map = new_map_2("nano-input.txt");
+        let paths = map.paths();
+        assert_eq!(paths.len(), 36);
+    }
+    #[test]
+    fn test_micro_2() {
+        let map = new_map_2("micro-input.txt");
+        let paths = map.paths();
+        assert_eq!(paths.len(), 103);
+    }
+    #[test]
+    fn test_2() {
+        let map = new_map_2("test-input.txt");
+        let paths = map.paths();
+        assert_eq!(paths.len(), 3509);
     }
 }
