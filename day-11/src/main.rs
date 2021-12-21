@@ -5,6 +5,7 @@ mod point;
 
 fn main() {
     part_1();
+    part_2();
 }
 
 #[derive(Copy, Clone)]
@@ -120,6 +121,17 @@ impl Cavern {
     fn update_octopus(&mut self, octopus: Octopus) {
         self.grid[point::point_to_idx(octopus.location) as usize] = Some(octopus);
     }
+
+    fn all_flash_first(&mut self) -> usize {
+        let mut previous_flash_count = 0;
+        let mut steps = 0;
+        while self.flash_count < 100 || previous_flash_count != (self.flash_count - 100) {
+            previous_flash_count = self.flash_count.clone();
+            self.steps(1);
+            steps += 1;
+        }
+        steps
+    }
 }
 
 fn populate_cavern(filename: &str) -> Cavern {
@@ -157,6 +169,11 @@ fn part_1() {
     println!("PART 1: {}", cavern.flash_count);
 }
 
+fn part_2() {
+    let mut cavern = populate_cavern("input.txt");
+    println!("PART 2: {}", cavern.all_flash_first());
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -186,5 +203,10 @@ mod tests {
         let mut cavern = populate_cavern("test-input.txt");
         cavern.steps(100);
         assert_eq!(cavern.flash_count, 1656);
+    }
+    #[test]
+    fn part_2() {
+        let mut cavern = populate_cavern("test-input.txt");
+        assert_eq!(cavern.all_flash_first(), 195);
     }
 }
