@@ -6,6 +6,7 @@ use std::collections::HashSet;
 
 fn main() {
     part_1();
+    part_2();
 }
 
 #[derive(Debug, PartialEq)]
@@ -57,6 +58,8 @@ struct TransparentPaper {
     // vertical_lines: HashMap<u16, Line>,
     horizontal_lines: HashMap<u16, Line>,
     instructions: Vec<Instruction>,
+    max_y: u16,
+    max_x: u16,
 }
 
 impl TransparentPaper {
@@ -85,6 +88,7 @@ impl TransparentPaper {
                 self.horizontal_lines.remove(&y);
             }
         }
+        self.max_y -= constant;
     }
     fn fold_vertically(&mut self, constant: u16) {
         for y in self.horizontal_lines.clone().into_keys() {
@@ -96,6 +100,7 @@ impl TransparentPaper {
                 }
             }
         }
+        self.max_x -= constant;
     }
     fn hole_count(&self) -> usize {
         let mut count = 0;
@@ -119,6 +124,8 @@ fn read_paper(filename: &str) -> TransparentPaper {
     // let mut horizontal_lines = HashMap::new();
     let mut instructions = Vec::new();
     let mut finished_holes = false;
+    let mut max_x = 0;
+    let mut max_y = 0;
     for line in reader.lines() {
         let line = line.unwrap();
         if line == "" {
@@ -128,7 +135,13 @@ fn read_paper(filename: &str) -> TransparentPaper {
                 .split(',')
                 .map(|x| x.parse::<u16>().unwrap())
                 .collect::<Vec<u16>>();
+            if coordinates[1] > max_y {
+                max_y = coordinates[1].clone();
+            }
             let line = horizontal_lines.entry(coordinates[1]).or_insert(new_line());
+            if coordinates[0] > max_x {
+                max_x = coordinates[0].clone();
+            }
             (*line).holes.insert(coordinates[0]);
             // horizontal_lines.insert(coordinates[1], coordinates[0]);
         } else {
@@ -143,13 +156,37 @@ fn read_paper(filename: &str) -> TransparentPaper {
             instructions.push(Instruction{ axis, constant });
         }
     }
-    TransparentPaper { horizontal_lines, instructions }
+    TransparentPaper { horizontal_lines, instructions, max_x, max_y }
+}
+
+impl std::fmt::Display for TransparentPaper {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut string = "".to_string();
+        for y in 0..(self.max_y) {
+            for x in 0..(self.max_x) {
+                let mut dot = " ";
+                if self.has_hole(&Coordinate{x,y}) {
+                    dot = "8";
+                }
+                string = format!("{}{}", string, dot);
+            }
+            string = format!("{}\n", string);
+        }
+        write!(f, "{}", string)
+    }
 }
 
 fn part_1() {
     let mut paper = read_paper("input.txt");
     paper.fold(Some(1));
     println!("PART 1: {}", paper.hole_count());
+}
+
+fn part_2() {
+    let mut paper = read_paper("input.txt");
+    paper.fold(None);
+    println!("PART 2-------------");
+    println!("{}", paper);
 }
 
 #[cfg(test)]
@@ -163,6 +200,8 @@ mod tests {
         assert_eq!(paper.instructions.len(), 2);
         assert_eq!(paper.instructions[0].axis, Axis::Y);
         assert_eq!(paper.instructions[0].constant, 7 as u16);
+        assert_eq!(paper.max_y, 14);
+        assert_eq!(paper.max_x, 10);
     }
     #[test]
     fn test_folding_1_step() {
@@ -175,5 +214,8 @@ mod tests {
         let mut paper = read_paper("test-input.txt");
         paper.fold(None);
         assert_eq!(paper.hole_count(), 16);
+        assert_eq!(paper.max_y, 7);
+        println!("{}", paper);
+        assert_eq!(paper.max_x, 5);
     }
 }
